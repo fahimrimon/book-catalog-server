@@ -30,6 +30,81 @@ const run = async () => {
       res.send({ status: true, data: books });
       
     });
+
+    // app.get('/books/:id', async(id) =>{
+    //     const result = await booksCollection.findOne(id);
+    //     return result;
+    // })
+
+    app.get("/book/:id", async (req, res) => {
+      const {id} = req.params;
+      const book = await booksCollection.findOne({ _id: new ObjectId(id) });
+
+      if (book) {
+        return res.status(200).send({
+          message: "Book details retrieved successfully!",
+          data: book,
+        });
+      } else {
+        return res.status(404).send({
+          message: "Book not found",
+        });
+      }
+    });
+
+    app.get("/books/recent", async (req, res) => {
+      const sort = { publishedYear: -1 };
+      const result = await booksCollection
+        .find({})
+        .sort(sort)
+        .limit(7)
+        .toArray();
+      return res.status(200).send({
+        message: "Recent Published Books retrieved successfully!",
+        data: result,
+      });
+    });
+
+
+app.post('/comment/:id', async (req, res) => {
+  const productId = req.params.id;
+  const comment = req.body.comment;
+
+  console.log(productId);
+  console.log(comment);
+
+  const result = await booksCollection.updateOne(
+    { _id: new ObjectId(productId) },
+    { $push: { comments: comment } }
+  );
+
+  console.log(result);
+
+  if (result.modifiedCount !== 1) {
+    console.error('Product not found or comment not added');
+    res.json({ error: 'Product not found or comment not added' });
+    return;
+  }
+
+  console.log('Comment added successfully');
+  res.json({ message: 'Comment added successfully' });
+});
+
+app.get('/comment/:id', async (req, res) => {
+  const productId = req.params.id;
+
+  const result = await booksCollection.findOne(
+    { _id: new ObjectId(productId) },
+    { projection: { _id: 0, comments: 1 } }
+  );
+
+  if (result) {
+    res.json(result);
+  } else {
+    res.status(404).json({ error: 'Product not found' });
+  }
+});
+
   } finally {
     // await client.close();
   }
