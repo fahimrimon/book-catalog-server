@@ -22,6 +22,69 @@ const run = async () => {
   try {
     const db = client.db('book-catalog');
     const booksCollection = db.collection('books');
+    const usersCollection = db.collection("users");
+
+    // Authentication
+    app.post("/auth/signup", async (req, res) => {
+      const userData = req.body;
+
+      const isExistUser = await usersCollection.findOne({
+        email: userData.email,
+      });
+      if (isExistUser) {
+        return res.status(400).send({
+          message: "This email already exist!",
+        });
+      } else {
+        // hashing password
+        const hashedPassword = await bcrypt.hash(userData.password, 12);
+
+        userData.password = hashedPassword;
+
+        const result = await usersCollection.insertOne(userData);
+        if (result.acknowledged == true) {
+          return res.status(200).send({
+            message: "User sign up successfully!",
+          });
+        } else {
+          return res.status(400).send({
+            message: "Sign Up Failed!",
+          });
+        }
+      }
+    });
+
+    app.post("/auth/login", async (req, res) => {
+      const userData = req.body;
+      const isAvailableUser = await usersCollection.findOne({
+        email: userData.email,
+      });
+      if (!isAvailableUser) {
+        return res.status(400).send({
+          message: "This email does not exist!",
+        });
+      } else {
+        const isPasswordMatched = await bcrypt.compare(
+          userData.password,
+          isAvailableUser.password
+        );
+        if (!isPasswordMatched) {
+          return res.status(400).send({
+            message: "Incorrect Password!",
+          });
+        } else {
+          const accessToken = await jwt.sign(
+            { email: isAvailableUser.email },
+            "accessToken",
+            { expiresIn: "30d" }
+          );
+          return res.status(200).send({
+            message: "Login successfully!",
+            token: accessToken,
+          });
+        }
+      }
+    });
 
     app.get('/books', async (req, res) => {
       const cursor = booksCollection.find({});
@@ -30,11 +93,6 @@ const run = async () => {
       res.send({ status: true, data: books });
       
     });
-
-    // app.get('/books/:id', async(id) =>{
-    //     const result = await booksCollection.findOne(id);
-    //     return result;
-    // })
 
     app.get("/book/:id", async (req, res) => {
       const {id} = req.params;
@@ -64,6 +122,25 @@ const run = async () => {
         data: result,
       });
     });
+
+    
+    // Add Book 
+
+    app.post("/books", async (req, res) => {
+          const bookData = req.body;
+          const result = await booksCollection.insertOne(bookData);
+          if (result.acknowledged == true) {
+            return res.status(200).send({
+              message: "Book added successfully!",
+              data: bookData,
+            });
+          } else {
+            return res.status(400).send({
+              message: "Book added failed!",
+            });
+          }
+      });
+
 
 
 app.post('/comment/:id', async (req, res) => {
